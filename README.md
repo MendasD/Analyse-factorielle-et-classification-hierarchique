@@ -74,6 +74,6 @@ Le jeu de données utilisé dans ce projet a été fourni par l'enseignant. Il e
 
 📧 Contact : christnzonde@gmail.com  
 📖 Cours : Analyse des données multidimensionnelles  
-🏫 Institution : Ecole Nationale de la Statistique et de l'Analyse Economique Pierre Ndiaye (ENSAE)  
+🏫 Institution : Ecole Nationale de la Statistique et de l'Analyse Economique Pierre Ndiaye ([ENSAE-Dakar](https://www.ensae.sn/) )🎓  
 
 ---
