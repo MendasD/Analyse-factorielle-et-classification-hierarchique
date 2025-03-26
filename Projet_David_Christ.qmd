@@ -1,0 +1,1336 @@
+---
+title: "Projet_ADM"
+author: "David Christ"
+from: markdown+emoji
+editor: visual
+date: "`r Sys.Date()`"
+format:
+  html:
+    df-print: paged
+    toc: true
+    theme: solarized
+    highlight-style: tango
+  docx:
+    toc: true
+  beamer:
+    theme: metropolis
+  pptx:
+    toc: true
+  revealjs:
+    slide-number: true
+    transition: fade
+    fig-width: 10
+    fig-height: 8
+    slide-level: 2
+    center: true
+    progress: true
+    controls: true
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+  slidy:
+    highlight-style: dracula
+code-fold: show
+self-contained: true
+echo: false
+---
+
+```{r setup, include=FALSE}
+#| echo: false
+### Désactiver les messages d'execution et les warnings
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+# **Projet final du cours Analyse des Données Multi-dimensionnelles** {style="color: blue"}
+
+![](Medias/page_garde_tp_final.png){width="100%"}
+
+------------------------------------------------------------------------
+
+## :pushpin: **Présentation du projet**
+
+Ce projet constitue le travail final du **cours d'analyse des données multidimensionnelles**. Il met en application des méthodes statistiques avancées à travers une **classification hiérarchique sur les composantes principales** issues d'une analyse factorielle. L'objectif est d'exploiter ces outils pour structurer et interpréter un ensemble de données économiques et démographiques.
+
+### :dart: **Objectifs spécifiques**
+
+Le projet couvre plusieurs aspects clés du cours, notamment :
+
+-   Justifier l'utilisation de la **classification hiérarchique** sur les **composantes principales**.\
+-   Réaliser une **analyse factorielle** adéquate sur le jeu de données fourni.\
+-   Appliquer la **classification hiérarchique** sur ces composantes principales.\
+-   Construire un **indice synthétique normalisé** basé sur les résultats de l'analyse factorielle.\
+-   Découper l'indice obtenu en **classes homogènes** à l'aide de la méthode des **k-means**.\
+-   Effectuer une **analyse factorielle discriminante** en utilisant la **classe d’indice** obtenue comme variable superviseur.
+
+Nous commencerons par une **présentation des données** avant d'aborder chaque étape méthodologique.
+
+------------------------------------------------------------------------
+
+## :bar_chart: **Présentation de la base de données**
+
+Le jeu de données utilisé dans ce projet a été fourni par l'enseignant. Il est au format **Excel** et décrit **120 pays** à l'aide de **12 variables quantitatives** reflétant des indicateurs économiques et démographiques.
+
+### :label: **Description des variables**
+
+| Variable | Description |
+|---------------------------------|---------------------------------------|
+| `Croi_PIB/hab` | Taux de croissance du PIB par habitant |
+| `Ctr_agri_PIB(%)` | Contribution de l'agriculture à la création de richesse |
+| `Poids_Exp_sur_PIB(%)` | Poids des exportations dans le PIB |
+| `Ctr_Tertiaire_PIB(%)` | Contribution du secteur tertiaire à la création de richesse |
+| `Ctrind_PIB(%)` | Contribution de l'industrie à la création de richesse |
+| `Tx_Eau_potable` | Taux d'accès à l'eau potable |
+| `Taux_pene_Tel_mob` | Taux de pénétration du téléphone mobile |
+| `Part_Pop_0-14_ans` | Part des enfants dans la population totale |
+| `Part_Pop_65ans_et_plus` | Part des personnes âgées dans la population totale |
+| `Pop_rurale` | Part de la population vivant en milieu rural |
+| `Croi_pop` | Taux de croissance démographique |
+| `Use_Index_Internet` | Indice d'utilisation d'Internet |
+
+------------------------------------------------------------------------
+
+## :rocket: **Méthodologie et étapes d'analyse**
+
+1.  **Prétraitement des données** : Vérification des valeurs manquantes et standardisation des variables.\
+2.  **Analyse factorielle** : Identification des composantes principales et justification de leur utilisation.\
+3.  **Classification hiérarchique** : Segmentation des pays en groupes homogènes sur la base des composantes principales.\
+4.  **Construction d’un indice synthétique** : Création d’un score normalisé pour chaque pays.\
+5.  **Clustering par k-means** : Découpage de l’indice synthétique en classes.\
+6.  **Analyse factorielle discriminante (AFD)** : Validation des classes obtenues en étudiant leur pouvoir discriminant.\
+7.  **Comparaison AFD et classification sur composantes principales**: Comparaison du taux d'erreur de classement (TEC) de l'AFD et celui de la classification sur composantes principales.
+
+------------------------------------------------------------------------
+
+## **Question 1** {#sec-question-1 style="color: blue"}
+
+L'application de la **classification hiérarchique** sur les **composantes principales** issues d’une analyse factorielle est une approche courante en statistique et en machine learning pour réduire le bruit (**denoising**) et éviter le sur-apprentissage (**overfitting**). Le terme **Denoising** (réduction du bruit) désigne la suppression du bruit dans un ensemble de données.Le **bruit** ici fait reférence à toute forme de données indésirables, qui pertube l'information essentielle que nous souhaitons analyser. De l'autre côté, le terme **Overfiting** (sur-apprentissage) fait reférence à une situation où un modèle d'apprentissage s'adapte trop étroitement aux données d'entraînement (*training*) capturant non seulement les tendances réelles, mais aussi, les particularités des données d'entraînement. Cela peut conduire à une très bonne performance sur les données d'entraînement, mais à une mauvaise performance sur des données non vues (données de test ou de nouvelles données), car le modèle a une faible capacité de généralisation.
+
+Ainsi apparaît alors la necessité d'effectuer la classification hiérarchique sur les composantes principales, car:
+
+-   les composantes principales **retiennent l'essentiel de l'information** contenue dans les variables d'origine,
+
+-   elles **filtrent le bruit** en éliminant les dimensions avec de faibles variances, souvent associées au bruit dans les données,
+
+-   aussi, les composantes principales sont des variables synthétiques, qui sont **moins sensibles aux fluctuations aléatoires** des données d'origine.
+
+```{r}
+#install.packages("webshot")
+webshot::install_phantomjs() # active la capture d'écran pour prendre en compte les visualisations interactives dans les documents word
+
+```
+
+
+```{r}
+#| echo: false
+# Installer les packages au besoin
+
+#install.packages("tidyverse")
+#install.packages("klaR")
+#install.packages("psych")
+#install.packages("MASS")
+#install.packages("devtools")
+#install.packages("caret")
+#install.packages("GGally")
+
+# Chargement des librairies à utiliser
+
+library(readxl)
+library(dplyr)
+library(tidyverse)   
+library(klaR)
+library(psych)
+library(MASS)
+library(devtools)
+library(caret)
+library(GGally)
+library(FactoMineR)
+library(factoextra)
+library(corrplot)
+library(ggplot2)
+library(plotly)
+
+```
+
+## **Question 2 : Réalisation de l'analyse factorielle** {#sec-question-2--réalisation-de-lanalyse-factorielle style="color: blue"}
+
+Notre jeu de données contient **121 observations** et **13 variables** dont 12 quantitatives et une variable qualitative (`Pays`) renseignant sur les pays. Nous allons tout d'abord mettre la variable `Pays` comme index, et puisqu'on disposera uniquement des variables quantitatives, nous réaliserons alors une **analyse en composantes principales (ACP)**, qui est la méthode d'analyse factorielle adaptée à ce type de variables.
+
+### Chargement du jeu de données
+
+```{r}
+df <- read_excel(path="Data/Projet_AS2.xlsx",sheet="Base_Projet")
+
+# Supprimer l'occurence de suisse avec la plus faible valeur de use_index_internet
+pays_suisse <- which(df$Pays == "Suisse")
+indice_a_supprimer <- pays_suisse[which.min(df$Use_Index_Internet[pays_suisse])]
+
+# Supprimer une seule occurence
+df <- df[-indice_a_supprimer, ]
+
+# Supprimer Emirats arab unis car il est un individu atypique
+#df <- df[-which(df$Pays == "Emirats arab unis"),]
+
+# Mettre la variable Pays en index
+df <- column_to_rownames(df, var="Pays")
+
+head(df,3)
+```
+
+### **Prétraitement**
+
+```{r}
+# Aperçu du dataframe
+head(df)
+```
+
+```{r}
+# Résumé des variables
+summary(df)
+```
+
+```{r}
+# Présence de valeurs manquantes
+sum(is.na(df))
+```
+
+```{r}
+# Affichage des boxplots
+
+# Conversion du dataframe en format long
+df_long <- as.data.frame(scale(df)) %>% 
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Valeur")
+
+# Création des boxplots
+ggplot(df_long, aes(x = Variable, y = Valeur)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + # Rotation des noms de variables
+  labs(title = "Boxplots des variables", x = "Variables", y = "Valeurs")
+
+```
+
+```{r}
+library(RColorBrewer)
+
+# Matrice de correlation linéaire
+
+# Calcul de la matrice de corrélation (en excluant les variables non numériques si nécessaire)
+cor_matrix <- cor(df, use = "complete.obs")
+
+corrplot(cor_matrix, method = "color", col = brewer.pal(n = 8, name = "RdBu"), 
+         type = "upper", tl.cex = 0.7, tl.srt = 45, number.cex = 0.7, addCoef.col = "black")
+
+```
+
+### **Réalisation de l'ACP**
+
+```{r}
+# copie de la base
+data <- df
+
+# Standardisation des données
+data <- scale(data)
+
+# réalisation de l'ACP
+Var_ACP = PCA(data, scale.unit = TRUE, graph = TRUE, ncp=5)
+summary(Var_ACP, nb.dec=2, nb.elements=Inf)
+```
+
+#### **Choix du nombre d'axes à retenir**
+
+Le choix du nombre d'axe à retenir a été fait en s'appuyant sur les méthodes du **critère de Kaiser** et **le taux d'inertie**.
+
+-   **Critère de kaiser :** selon ce critère, nous retiendrons les axes dont la valeur propre est supérieure à **1**. L'application de ce critère nous conduit alors au choix des trois premiers axes ayant comme valeurs propres respectives **6,01 1,65 et 1,44**.
+
+-   **Taux d'inertie :** selon ce critère, nous devons retenir des axes de telle sorte que la part cumulée d'inertie expliquée soit au moins égale à **70%**. L'application de ce critère nous conduit également au choix des trois premiers axes.
+
+Ainsi, pour la suite, nous nous limiterons aux **trois premiers axes**, ce qui rend compte de **76%** de l'information, soit **50,2%** pour la **première dimension**, **13,8%** pour la **deuxième dimension** et **12%** pour la **troisième**.
+
+```{r}
+# Analyse de l'inertie, et détermination du nombre de composantes à retenir
+val_propres <- get_eig(Var_ACP)
+val_propres
+
+# Ebouli des valeurs propres
+# On ameliore la visualisation
+fviz_eig(X = Var_ACP, ylim=c(0,85),addlabels = TRUE,
+         barcolor="yellow",barfill = "blue",xlab="Valeurs propres",ylab="Part de l'inertie expliquée", 
+         main="Histogramme des valeurs propres", linecolor = "green", ggtheme = theme_dark())
+```
+
+#### **Analyse du nuage des variables**
+
+```{r}
+# Coordonnées des variables sur les trois axes
+variables_3D <- data.frame(Axe1 = Var_ACP$var$coord[, 1],
+                           Axe2 = Var_ACP$var$coord[, 2],
+                           Axe3 = Var_ACP$var$coord[, 3],
+                           Variable = rownames(Var_ACP$var$coord))
+
+# Représentation des variables en 3D
+plot_ly()%>%
+  add_trace(data = variables_3D, x = ~Axe1, y = ~Axe2, z = ~Axe3,text = ~Variable, 
+              type = "scatter3d", mode = "markers+text", 
+              marker = list(size = 5, color = "red"), 
+              name = "Individus") %>%
+  
+  # Mise en page (titres des axes)
+    layout(title = "Représentation des variables en 3D",
+           scene = list(
+             xaxis = list(title = "Axe1"),
+             yaxis = list(title = "Axe2"),
+             zaxis = list(title = "Axe3")
+           ))
+```
+
+##### **Contribution des variables**
+
+La quasi totalité des variables ont une bonne contribution sur le premier axe, excepté les variables `Croi PIB/hab`, `Poids_Exp_sur_PIB(%)` et `Ctrind_PIB(%)` qui contribuent faiblement à la formation de la dimension 1. Quant à la deuxième dimension, les variables les plus contributrices sont `Ctrind_PIB(%)`, `Croi PIB/hab`, `Poids_Exp_sur_PIB(%)` et `Ctr_Tertiaire_PIB(%)`. Les autres variables participent très faiblement à la formation de cet axe. Pour le troisième axe, les variables ayant de bonnes contributions sont `Croi PIB/hab` et `Crois_pop`.
+
+```{r}
+# Récupération des variables de l'objet PCA
+var_pca <- get_pca_var(Var_ACP)
+
+corrplot(var_pca$contrib, is.corr= F)
+#print(var_pca$contrib)
+
+Var_ACP |>
+  factoextra::fviz_contrib(choice = "var", axes = 1)
+
+Var_ACP |>
+  factoextra::fviz_contrib(choice = "var", axes = 2)
+
+Var_ACP |>
+  factoextra::fviz_contrib(choice = "var", axes = 3)
+```
+
+##### **Cercle de correlation et qualité de représentation des variables**
+
+L'analyse de la qualité de représentation des variables révèle que pratiquement toutes les variables ont une bonne qualité de représentation sur le premier axe, à l'exception des variables citées plus haut, qui contribuent faiblement à la formation de cet axe. Par ailleurs, seules variables `Ctrind_PIB(%)`, `Croi PIB/hab`, `Poids_Exp_sur_PIB(%)` et `Ctr_Tertiaire_PIB(%)` sont bien représentées sur le deuxième axe. Sur la troisième dimension, seule la variable `Croi PIB/hab` est bien représentée. Dans la suite, nous interprêterons uniquement les variables qui ont une bonne contribution et qui sont bien représentées sur les axes.
+
+```{r}
+# Cercle de correlation suivant la qualité de représentation sur les axes 1 et 2
+fviz_pca_var(X = Var_ACP,
+             axes=c(1,2),
+             col.var="cos2",
+             fill.var = "black",
+             col.quanti.sup="green",
+             repel=TRUE)  + theme_minimal()
+
+# Cercle de correlation suivant la qualité de représentation sur les axes 1 et 3
+fviz_pca_var(X = Var_ACP,
+             axes=c(1,3),
+             col.var="cos2",
+             fill.var = "black",
+             col.quanti.sup="green",
+             repel=TRUE)  + theme_minimal()
+
+print(var_pca$cos2)
+corrplot(var_pca$cos2, is.corr=F)
+
+Var_ACP |>
+  factoextra::fviz_cos2(choice = "var", axes = 1)
+
+Var_ACP |>
+  factoextra::fviz_cos2(choice = "var", axes = 2)
+
+Var_ACP |>
+  factoextra::fviz_cos2(choice = "var", axes = 3)
+
+```
+
+```{r}
+# Correlation entre les trois premières dimensions et les variables initales, au seuil de 5%
+description <- dimdesc(Var_ACP, axes=1:3, proba=0.05)
+description
+
+# On remarque en général pour les trois axes que, les variables les plus fortement correlées sont celles qui ont une bonne contribution et qui sont bien représentées sur l'axe. Par ailleurs, tous les résultats obtenus sont significatifs au seuil de 5%
+```
+
+**Conclusion :** Au regard des contributions, coordonnées (correlation), et qualité de représentation des différentes variables, il ressort que :
+
+le premiser axe factoriel permet de distinguer les deux groupes de variables suivantes :
+
+-   **Groupe 1:** `Taux_pene_Tel_mob`, `Ctr_Tertiaire_PIB(%)`, `Tx_Eau_potable`, `Part_Pop_65ans_et_plus`, `Use_Index_Internet`;
+-   **Groupe 2:** `Ctr_agri_PIB(%)`, `Part_Pop_0-14 ans`, `Pop_rurale`, `Crois_pop`
+
+L' axe 1 oppose donc les variables du groupe 1 (qui sont correlées positivement à l'axe) aux variables du groupe 2, qui quant à elles sont correlées négativement à l'axe. En d'autres termes, cet axe oppose deux catégories de pays:
+
+1.  les pays ayant de fortes valeurs pour les variables du groupe 1, et de faibles valeurs pour les variables du groupe 2: **pays développés**;
+
+2.  les pays ayant de fortes valeurs pour les variables du groupe 2, et de faibles valeurs pour celles du groupe 1: **pays sous-développés**.
+
+Par ailleurs, la deuxième dimension met en opposition les deux groupes de variables suivants:
+
+-   **Groupe 1:** `Ctrind_PIB(%)`, `Poids_Exp_sur_PIB(%)`, `Croi PIB/hab`;
+
+-   **Groupe 2:** `Ctr_Tertiaire_PIB(%)`
+
+Ainsi, le deuxième permet de distinguer deux profils de pays:
+
+1.  les pays ayant de fortes valeurs pour les variables du groupe 1, et de faibles valeurs pour les variables du groupe 2: **pays à économie industrielle et exportatrice**;
+
+2.  les pays ayant de fortes valeurs pour les variables du groupe 2, et de faibles valeurs pour celles du groupe 1: **pays à économie tertiaire**.
+
+Le troisième axe quant à lui permet de distinguer deux profils de pays, suivant leur valeur pour la variable `Croi PIB/hab`. Les pays situés à gauche de cet axe sont caractérisés par des **taux de croissance du PIB par tête élevés**.
+
+#### **Analyse du nuage des individus**
+
+##### **Représentation du nuage des individus**
+
+```{r}
+data_3D_ind <- data.frame(Axe1 = Var_ACP$ind$coord[,1], 
+                      Axe2 = Var_ACP$ind$coord[,2], 
+                      Axe3 = Var_ACP$ind$coord[,3],
+                      Variable = rownames(Var_ACP$ind$coord))
+
+plot_ly()%>%
+  add_trace(data = data_3D_ind, x = ~Axe1, y = ~Axe2, z = ~Axe3,text = ~Variable, 
+              type = "scatter3d", mode = "markers+text", 
+              marker = list(size = 3, color = "blue"), 
+              name = "Individus") %>%
+  
+  # Mise en page (titres des axes)
+    layout(title = "Représentation des individus en 3D",
+           scene = list(
+             xaxis = list(title = "Axe1"),
+             yaxis = list(title = "Axe2"),
+             zaxis = list(title = "Axe3")
+           ))
+```
+
+```{r}
+# Representation des individus sur les axes 1 et 2
+fviz_pca_ind(X = Var_ACP,
+             axes=c(1,2),
+             col.ind = "blue",
+             palette=c("green","yellow"),
+             repel=T)
+
+# Representation des individus sur les axes 1 et 3
+fviz_pca_ind(X = Var_ACP,
+             axes=c(1,3),
+             col.ind = "blue",
+             palette=c("green","yellow"),
+             repel=T)
+
+# Representation des individus sur les axes 2 et 3
+fviz_pca_ind(X = Var_ACP,
+             axes=c(2,3),
+             col.ind = "blue",
+             palette=c("green","yellow"),
+             repel=T)
+```
+
+##### **Contribution des individus**
+
+L'axe 1 oppose les pays telsque Luxembourg, Belgique, Singapore, Canada, Etats-Unis aux pays pays telsque le Mali, l'OUganda, la Tanzanie, le Tchad.
+
+Le deuxième axe quant à lui, met en opposition les pays comme l'Angola, la République du Congo,le Nigéria, l'Algérie, avec les pays telsque les Etats-Unis, la France, la Tanzanie, le Burkina Faso.
+
+La troisième dimension permet de distinguer les pays telsque Emirats arab unis, Singapore, Réoublique du Congo, avec les pays comme l' Arménie, la Georgie, l'Ukraine.
+
+```{r}
+ind_pca <- get_pca_ind(Var_ACP)
+# On représente les pays qui contribuent le plus (les 80% les plus contributives)
+
+# Sur les axes 1 et 2
+plot(Var_ACP,autoLab = "auto",cex=0.7, habillage = "contrib", select="contrib 80.0", axes=c(1,2))# cex controle la taille de la police
+
+# Sur les axes 1 et 3
+plot(Var_ACP,autoLab = "auto",cex=0.7, habillage = "contrib", select="contrib 80.0", axes=c(1,3))
+
+# Sur les axes 2 et 3
+plot(Var_ACP,autoLab = "auto",cex=0.7, habillage = "contrib", select="contrib 80.0", axes=c(2,3))
+
+print(ind_pca$contrib)
+```
+
+##### **Qualité de représentation des individus**
+
+```{r}
+# Nuage de point des individus en prenant ceux qui ont un cos2 >=0.5 
+
+# Sur les axes 1 et 2
+plot(Var_ACP,autoLab = "auto",cex=0.7, habillage="cos2", select="cos2 0.5", axes=c(1,2))
+
+# Sur les axes 1 et 3
+plot(Var_ACP,autoLab = "auto",cex=0.7, habillage="cos2", select="cos2 0.5", axes=c(1,3))
+
+# Sur les axes 2 et 3
+plot(Var_ACP,autoLab = "auto",cex=0.7, habillage="cos2", select="cos2 0.5", axes=c(2,3))
+```
+
+#### **Représentation simultanée**
+
+```{r}
+plot_ly() %>%
+  # Première trace : `data_3D_ind` (individus)
+  add_trace(data = data_3D_ind, x = ~Axe1, y = ~Axe2, z = ~Axe3, 
+            type = "scatter3d", mode = "markers", 
+            marker = list(size = 3, color = "blue"), 
+            name = "Individus") %>%
+  
+  # Deuxième trace : `variables_3D` (variables)
+  add_trace(data = variables_3D, x = ~Axe1, y = ~Axe2, z = ~Axe3, 
+            type = "scatter3d", mode = "text+markers", 
+            text = ~Variable, textposition = "top center",
+            marker = list(size = 5, color = "red"), 
+            name = "Variables") %>%
+  
+  # Mise en page (titres des axes)
+  layout(title = "Représentation des individus et variables en 3D",
+         scene = list(
+           xaxis = list(title = "Axe1"),
+           yaxis = list(title = "Axe2"),
+           zaxis = list(title = "Axe3")
+         ))
+
+```
+
+```{r}
+# Biplot sur les axes 1 et 2
+fviz_pca_biplot(Var_ACP, axes = c(1,2),  
+                col.ind = "blue",
+                col.var = "red",
+                geom.ind = "point",
+                repel = TRUE)
+
+# Biplot sur les axes 1 et 3
+fviz_pca_biplot(Var_ACP, axes = c(1,3),  
+                col.ind = "blue",
+                col.var = "red",
+                geom.ind = "point",
+                repel = TRUE)
+
+# Biplot sur les axes 2 et 3
+fviz_pca_biplot(Var_ACP, axes = c(2,3),  
+                col.ind = "blue",
+                col.var = "red",
+                geom.ind = "point",
+                repel = TRUE)
+```
+
+**Conclusion générale de l'ACP:**
+
+A l'issu de l'analyse factorielle, il ressort que la dimension 1 oppose les pays telsque Luxembourg, Belgique, Singapore, Canada, Etats-Unis, situés du **côté droit de l'axe** caractérisés par de fortes valeurs pour les variables `Taux_pene_Tel_mob`, `Ctr_Tertiaire_PIB(%)`, `Tx_Eau_potable`, `Part_Pop_65ans_et_plus`, `Use_Index_Internet` et de faibles valeurs pour les variables `Ctr_agri_PIB(%)`, `Part_Pop_0-14 ans`, `Pop_rurale`, `Crois_pop` contre les pays telsque le Mali, l'OUganda, la Tanzanie, le Tchad caractérisés par de fortes valeurs pour les variables `Ctr_agri_PIB(%)`, `Part_Pop_0-14 ans`, `Pop_rurale`, `Crois_pop` et de faibles valeurs pour les variables `Taux_pene_Tel_mob`, `Ctr_Tertiaire_PIB(%)`, `Tx_Eau_potable`, `Part_Pop_65ans_et_plus`, `Use_Index_Internet`. Par conséquent, le premier axe est donc nommé **axe du développement**.
+
+Le deuxième axe quant à lui oppose les pays caractérisés avec des valeurs élevées pour les variables `Ctrind_PIB(%)`, `Poids_Exp_sur_PIB(%)`, `Croi PIB/hab` et de faibles valeurs pour la variable `Ctr_Tertiaire_PIB(%)`, à l'exemple de l'Angola, la République du Congo,le Nigéria, l'Algérie, situés **à droite de l'axe** contre les pays avec de fortes valeurs pour la variable `Ctr_Tertiaire_PIB(%)` et de faibles valeurs pour les variables `Ctrind_PIB(%)`, `Poids_Exp_sur_PIB(%)`, `Croi PIB/hab`: les Etats-Unis, la France, la Tanzanie, le Burkina Faso. Ainsi le second axe est appelé **axe de l'économie tertiaire à l'économie industrielle et exportatrice**.
+
+Le troisième axe permet d'opposer les pays ayant **un taux de croissance du PIB par habitant élevé** situés **à gauche de l'axe** contre ceux avec un faible taux. Cet axe peut donc être nommé **axe de la croissance du PIB par habitant**.
+
+## **Question 3: Classification hiérarchique sur composantes principales** {#sec-question-3-classification-hiérarchique-sur-composantes-principales style="color: blue"}
+
+Dans cette partie, nous effectuerons une classification ascendante hiérarchique sur les composantes pricipales de l'analyse factorielle.Pour ce faire, nous commencerons par extraire les coordonnées des individus sur les axes retenus et les stockées dans une variable. Le calcul de la matrice de distance sera alors fait à partir des ces valeurs.
+
+### **Calcul de la matrice de distance**
+
+La matrice des distances est faite ici en utilisant la **norme euclidienne**. Elle donne pour chaque individu, la distance entre les autres individus et lui même, sur la base de métrique utilisée.
+
+```{r}
+# Extraire les coordonnées des individus
+ind_coords <- Var_ACP$ind$coord
+# Se limiter aux trois axes retenus
+ind_coords <- ind_coords[,1:3]
+# Standardiser les données
+ind_coords <- scale(ind_coords)
+
+# Matrice des distances
+dist_matrix <-dist(ind_coords, method = "euclidean")
+print(dist_matrix[1:5])
+```
+
+### **Réalisation de la CAH**
+
+La méthode d'aggrégation utilisée ici est **la méthode de ward D2**.
+
+```{r}
+cah <- hclust(dist_matrix, method = "ward.D2")
+# Affichage du dendrogramme
+plot(cah, labels = FALSE, hang = -1, main = "Dendrogramme de la CAH")
+```
+
+### **Choix du nombre de classes**
+
+#### **Diagramme des indices de niveau**
+
+Nous utiliserons le diagramme des indices de niveau afin de déterminer le nombre optimal de classe pour la réalisation de la CAH. La visualisation de ce diagramme suggère dès lors de découper nos données en 4 classes.
+
+```{r}
+# Extraire les indices de niveau à partir de l'objet hclust
+indices_niveau <- rev(cah$height)  # Les indices de niveau sont dans cah$height, inversés pour correspondre aux étapes
+
+# Créer les étapes successives
+etapes <- seq_along(indices_niveau)  # Numéro des étapes
+
+# Tracer l'histogramme
+barplot(indices_niveau,
+        names.arg = etapes, # Numéro des étapes sur l'axe X
+        col = "lightblue",  # Couleur des barres
+        main = "Histogramme des indices de niveau", 
+        xlab = "Étapes de fusion",   
+        ylab = "Indice de niveau (Inertie)", 
+        border = "blue")  # Couleur des bordures
+
+```
+
+#### **Représentation des sauts d'inertie**
+
+```{r}
+inertie <- sort(cah$height, decreasing = TRUE)
+plot(inertie[1:20], type = "s", xlab = "Nombre de classes", ylab = "Inertie",main="Sauts d'inertie")
+points(c(3, 4, 5, 6), inertie[c(3, 4, 5, 6)], col = c("green3", "red3", "blue3", "yellow"), cex = 2, lwd = 3)
+```
+
+#### **Méthode du coefficient de silhouette**
+
+Le **coefficient de silhouette** est une valeur comprise entre **-1 et 1**, mesurant la qualité du clustering en évaluant dans quelle mesure chaque point est bien assigné à son cluster. Il permet de vérifier si les clusters sont bien séparés et compacts. Ainsi, plus le coefficient est élevé, plus le nombre de classe correspondant est optimal. En traçant la courbe du coefficient de silhouette pour un nombre de classe allant de **2 à 10**, il ressort que le nombre de classe optimal à considérer est **4**.
+
+```{r}
+library(cluster)
+
+# Calcul des coefficients de silhouette pour différents nombres de classes
+range_k <- 2:10  # Nombre de clusters à tester
+silhouette_scores <- numeric(length(range_k))
+
+for (k in range_k) {
+  clusters <- cutree(cah, k)  # Découper l'arbre en k clusters
+  sil <- silhouette(clusters, dist_matrix)  # Calcul du coefficient de silhouette
+  silhouette_scores[k - 1] <- mean(sil[, 3])  # Stocker le score moyen
+}
+
+# Tracer la courbe des coefficients de silhouette
+silhouette_frame <- data.frame(Clusters = range_k, Silhouette = silhouette_scores)
+
+ggplot(silhouette_frame, aes(x = Clusters, y = Silhouette)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red", size = 2) +
+  labs(title = "Courbe des coefficients de silhouette",
+       x = "Nombre de classes",
+       y = "Coefficient de silhouette") +
+  theme_minimal()
+```
+
+```{r}
+# Découper le dendrogramme en 3 groupes
+clusters <- cutree(cah, k = 4)
+
+# Afficher le dendrogramme avec des étiquettes
+plot(cah, labels = FALSE, hang = -1, main = "Dendrogramme de la CAH")
+
+# Ajouter des rectangles autour des groupes
+rect.hclust(cah, k = 4, border = 2:5) 
+
+```
+
+```{r}
+library(dendextend)
+library(ggplot2)
+
+ggplot(color_branches(cah, k = 4), labels = FALSE)
+```
+
+### **Visualisation des clusters sur les composantes principales**
+
+Pour réaliser cette visualisation, nous utiliserons la fonction **HCPC (Hierarchical Clustering on Principle Components)** du package **FactoMineR**, qui permet donc de faire une classification hiérarchique sur des composantes principales. On obtient ainsi quatre (04) groupes de pays. Les pays du groupe 1 sont situés plutôt à l'extrême gauche du premier axe tandisque les pays du quatrième groupe sont plutôt à l'extrême droite du premier axe. Par ailleurs, la majeure partie des pays du groupe 3 sont à droite de l'axe 1 alors qu'une bonne partie des pays du groupe 2 sont à gauche de cet axe. Aussi, comparativement aux pays du groupe 2, ceux du groupe 3 sont très à gauche de l'axe 3. En se reférant aux résultats de l'ACP réalisés plus haut, cela suggèrerait que les pays du premier groupe sont caractérisés par de fortes valeurs pour les variables `Ctr_agri_PIB(%)`, `Part_Pop_0-14 ans`, `Pop_rurale`, `Crois_pop` et de faibles valeurs pour les variables `Taux_pene_Tel_mob`, `Ctr_Tertiaire_PIB(%)`, `Tx_Eau_potable`, `Part_Pop_65ans_et_plus`, `Use_Index_Internet`. A l'opposé, les pays du groupe 4 présenteraient de fortes valeurs valeurs pour les variables `Taux_pene_Tel_mob`, `Ctr_Tertiaire_PIB(%)`, `Tx_Eau_potable`, `Part_Pop_65ans_et_plus`, `Use_Index_Internet` et de faibles valeurs pour les variables `Ctr_agri_PIB(%)`, `Part_Pop_0-14 ans`, `Pop_rurale`, `Crois_pop`. Les pays du groupe 2 auraient également des valeurs moins élevés que ceux du groupe 3 pour les variables `Taux_pene_Tel_mob`, `Ctr_Tertiaire_PIB(%)`, `Tx_Eau_potable`, `Part_Pop_65ans_et_plus`, `Use_Index_Internet`. Par ailleurs, le groupe 3 regrouperait des pays avec un taux de croissance du PIB par habitant très élevé.
+
+
+```{r}
+hcpc <- HCPC(Var_ACP, graph = FALSE, metric = "euclidean", method="ward", nb.clust = 4, min = 3, iter.max = 10)
+
+# Visualisation sur les dimensions 1 et 2
+fviz_cluster(hcpc, palette = "Dark2", show.clust.cent = T, main = "CAH sur les composantes", labelsize=1, axes = c(1,2))
+
+# Visualisation sur les dimensions 1 et 3
+fviz_cluster(hcpc, palette = "Dark2", show.clust.cent = T, main = "CAH sur les composantes", labelsize=1, axes = c(1,3))
+
+# Visualisation sur les dimensions 2 et 3
+fviz_cluster(hcpc, palette = "Dark2", show.clust.cent = T, main = "CAH sur les composantes", labelsize=1, axes = c(2,3))
+```
+
+### **Quelques caractéristiques des clusters**
+
+Le groupe 1 est constitué de 36 pays, le deuxième groupe 47 pays, le troisième 13 pays et le groupe 4 est constitué de 24 pays.
+
+```{r}
+# Récupérer le nouveau dataframe avec la variable cluster
+data_cluster <- hcpc$data.clust
+print(data_cluster[1:3,c(1,2,3,13)])
+
+# Moyennes intra cluster pour chaque variable
+moyennes_intra <- data_cluster %>%
+  group_by(clust) %>%
+  summarize(across(everything(), mean, na.rm = TRUE))  # Calcul des moyennes par cluster
+
+# Nombre de pays par cluster
+nombre_pays <- data_cluster %>% group_by(clust) %>% summarise(nombre = n())
+
+head(moyennes_intra)
+print(nombre_pays)
+```
+
+### **Parangons des clusters**
+
+Le parangon d'un cluster correspond à l'individu le plus proche du centre de ce cluster. Ainsi, après le calcul des distances entre les différents individus et le centre de leur groupe, les parangons trouvés sont: **Zimbabwe** pour **le groupe 1**, **Liban** pour le **groupe 2**, **Chine** pour le troisième groupe et **Etats-Unis** pour **le quatrième groupe**.
+
+```{r}
+library(dplyr)
+
+# Dataframe avec les données initiales, les clusters et les scores de l'ACP
+data_ <- cbind(df, clust=hcpc$data.clust$clust, Var_ACP$ind$coord)
+data_ <- data_ %>% mutate(clust = as.numeric(clust))
+
+# Calcul des centroïdes dans le premier plan de l'ACP
+centroides <- data_ %>%
+  group_by(clust) %>%
+  summarize(across(Dim.1:Dim.3, mean, na.rm = TRUE))
+
+# Fonction pour calculer la distance euclidienne
+distance_euclidienne <- function(ligne, centroide) {
+  sum((ligne - centroide) ^ 2, na.rm = TRUE)
+}
+
+# Détermination des parangons
+parangons <- data_ %>% rowwise() %>% # appliquer ligne par ligne
+  mutate(distance = distance_euclidienne(c_across(-clust), centroides[clust, -1])) %>%
+  group_by(clust) %>% slice_min(order_by = distance, n = 1) %>% ungroup() 
+
+ # Trouver les indices des pays dans df correspondant aux valeurs de parangons[, 1:12]
+indices <- match(do.call(paste, parangons[, 1:12]), do.call(paste, df[, 1:12])) # do.call(paste,df) permet de fusionner les colonnes de df en une seule chaîne de caractères 
+
+# Récupérer les noms des pays correspondants
+pays_parangons <- rownames(df)[indices]
+
+# Ajouter ces noms dans parangons
+parangons$Pays <- pays_parangons
+
+#Mettre les variables Pays et Clust en avant, et  puis le reste
+parangons <- parangons[, c("Pays", "clust", setdiff(names(parangons), c("Pays", "clust")))]
+
+# Afficher le dataframe avec les noms des pays
+print(parangons)
+```
+
+### **Visualisation des individus des différents clusters**
+
+```{r}
+# Pays du groupe 1
+groupe1 <- which(data_cluster$clust==1)
+groupe1_pays <- rownames(data)[groupe1]
+
+# Pays du groupe 2
+groupe2 <- which(data_cluster$clust==2)
+groupe2_pays <- rownames(data)[groupe2]
+
+# Pays du groupe 3
+groupe3 <- which(data_cluster$clust==3)
+groupe3_pays <- rownames(data)[groupe3]
+
+# Pays du groupe 4
+groupe4 <- which(data_cluster$clust==4)
+groupe4_pays <- rownames(data)[groupe4]
+
+# Ajuster la taille si les groupes n'ont pas la même taille
+max_length <- max(length(groupe1_pays), length(groupe2_pays), length(groupe3_pays), length(groupe4_pays))
+
+# Completer avec des NA pour ajuster la taille
+groupe1_pays <- c(groupe1_pays, rep(NA, max_length - length(groupe1_pays)))
+groupe2_pays <- c(groupe2_pays, rep(NA, max_length - length(groupe2_pays)))
+groupe3_pays <- c(groupe3_pays, rep(NA, max_length - length(groupe3_pays)))
+groupe4_pays <- c(groupe4_pays, rep(NA, max_length - length(groupe4_pays)))
+
+groupes <- data.frame(groupe1 = groupe1_pays, groupe2 = groupe2_pays, groupe3 = groupe3_pays, groupe4 = groupe4_pays)
+
+head(groupes,10)
+
+```
+
+### **Labeliser les clusters**
+
+En raison des analyses précédentes, on pourrait labeliser les clusters obtenus ainsi qu'il suit:
+
+- le premier cluster correspond aux **pays à économie agricole et à faible développement**, caractérisés par une population jeune, une économie dominée par l'agriculture, une forte population rurale, et une faible contribution du secteur tertiaire dans le PIB. Il s'agit entre autres des pays comme le Niger, le Tchad, le Bangladesh.
+
+- le deuxième cluster correspond aux **pays en développement à économie tertiaire**, caractérisée par une population relativement jeune, une contribution du secteur tertiaire au PIB élevé, une dépendance à l'agriculture moins prononcée que pour le groupe précédent, mais toujours importante. Dans ce groupe se situe entre autres: la République du Congo, le Paraguay, l' Angola;
+
+- le troisième aux **pays émergents, et en transition économique**, caractérisé par une forte croissance du PIB par habitant, un accès progressif aux infrastructures modernes (eau potable, télécommunications), une forte expansion du secteur secondaire (industrie, exportations). On y retrouve les pays tels que la Chine, l' Ukraine, la Roumanie;
+
+- le quatrième cluster correspond aux **pays développés et avancés**, avec une forte pénétration des technologies, une population essentiellement vieille, une faible croissance démographique, une économie dominée par le secteur tertiaire. Il s'agit des pays comme la France, les Etats-Unis, l' Allemagne.
+
+```{r}
+data_cluster$clust <- factor(data_cluster$clust, levels = c(1,2,3,4), labels = c("Pays à économie agricole et faible développement","Pays en développement et à économie tertiaire","Pays émergents et en transition économique","Pays développés et avancés"))
+
+print(unique(data_cluster$clust))
+```
+
+## **Question 4: Indice synthétique normalisé** {#sec-question-4-indice-synthétique-normalisé style="color: blue"}
+
+Les résultats obtenus après calcul de l'indice normalisé montrent que les pays développés ont les indices les plus élevés, supérieur à 0,5 pour chaque pays de ce groupe. L'indice moyen de ce groupe est de **0,73**. Ensuite viennent les pays émergents, qui présentent également des valeurs modérées de l'indice, avec quelques pays qui se démarquent avec des indices légèrement plus élevés. La valeur moyenne de l'indice pour ce groupe est de **0,35**. Les pays sous développés et moins avancés ont plutôt des valeurs assez voisines pour l'indice. Pour ces groupes, les indices moyens sont respectivement **0,30** et **0,25**. En se reférant à la construction de cet indice (axes qui le compose) ainsi qu'aux interprétations données aux axes de l'ACP, nous pouvons dire que l'indice obtenu est **un indice de développement économique et structurel (IDES)**. En effet, cet indicateur permet de prendre en compte les trois dimensions suivantes:
+
+- **le développement global** (axe 1: axe du développement)
+
+- **la structure économique** (axe 2: passage d'une économie tertiaire à une économie industrielle et exportatrice)
+
+- **la dynamique de croissance** (axe 3: croissance du PIB par habitant)
+
+```{r}
+# Fonction de normalisation 
+normalise <- function(value,min,max){
+  (value - min) / (max - min)
+}
+
+# Normalisation du dataframe
+data_norm <- df%>% mutate(across(where(is.numeric), ~ normalise(.x, min(.x), max(.x)))) 
+
+# Récupération des contributions
+contributions <- Var_ACP$var$contrib
+contributions <- as.data.frame(contributions) # transformer en dataframe
+
+
+# Valeurs propres et poids des axes
+valeurs_propres <- Var_ACP$eig
+poids_dim1 <- valeurs_propres[1,1] / (valeurs_propres[1,1] + valeurs_propres[2,1] + valeurs_propres[3,1])
+poids_dim2 <- valeurs_propres[2,1] / (valeurs_propres[1,1] + valeurs_propres[2,1] + valeurs_propres[3,1])
+poids_dim3 <- valeurs_propres[3,1] / (valeurs_propres[1,1] + valeurs_propres[2,1] + valeurs_propres[3,1])
+
+# Fonction pour calculer l'indice élémentaire de l'individu représenté par <ligne> sur l'axe <dimension>
+fun_indice_elementaire <- function(ligne,dimension){
+  contrib <- contributions[,dimension]
+  val_indice <- sum(ligne * dimension)
+  
+  return(val_indice)
+}
+
+
+# Indices élémentaires et indice global
+data_norm <- data_norm%>%rowwise()%>%
+  mutate(indice_1 = fun_indice_elementaire(c_across(),1), 
+         indice_2 = fun_indice_elementaire(c_across(-indice_1),2),
+         indice_3 = fun_indice_elementaire(c_across(-c(indice_1,indice_2)),3),
+         indice_global = indice_1 * poids_dim1 + indice_2 * poids_dim2 + indice_3 * poids_dim3)%>%ungroup()
+
+
+# Normalisation de l'indice
+data_norm <- data_norm %>%
+  mutate(indice_norm = normalise(indice_global, min(indice_global), max(indice_global)))
+
+
+# Coordonnées des individus sur les dimensions
+#coordonnees <- Var_ACP$ind$coord
+#coordonnees <- coordonnees[,c(1,2)] # On se restreint au plan factoriel
+
+# Ajout des coordonnées au dataframe
+#data_norm <- cbind(data_norm, Dim.1 = coordonnees[,1], Dim.2 = coordonnees[,2])
+
+
+
+head(data_norm)
+
+
+```
+
+### **Visualisation des indices**
+
+```{r}
+data_indice <- data_cluster
+data_indice <- data_indice%>%rownames_to_column(var = "Pays")
+data_indice$indice <- data_norm$indice_norm
+
+print(data_indice[1:120,c("Pays","clust","indice")])
+
+ggplot(data = data_indice, aes(x=clust, y=indice)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red", size = 2) +
+  labs(title = "Distribution des indices normalisés",
+       x = "cluster",
+       y = "Indice") +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+### **Valeur moyenne de l'indice dans chaque cluster**
+
+```{r}
+indices_moyens <- data_indice %>%group_by(clust) %>%summarize(across(indice, mean, na.rm = TRUE))
+
+indices_moyens
+```
+
+## **Question 5: Découpage de l'indice en classe par la méthode des k-means** {#sec-question-5-découpage-de-lindice-en-classe-par-la-méthode-des-k-means style="color: blue"}
+
+La méthode des k-means est une méthode de classification (**non supervisée**), permettant de séparer des individus en k classes homogènes à l'intérieur et hétérogènes entre elles. Conformément à la consigne de l'exercice, nous effectuerons cet algorithme avec le même nombre de classes que celui obtenu plus haut, à la CAH. Autrement dit, nous découperons notre indice en 4 classes.
+
+```{r}
+data_kmeans <- data
+# Calcul de la somme des carrés intra-cluster (WSS) pour différents k
+ wss <- sapply(1:10,function(k) { kmeans(data, centers = k, nstart = 25)$tot.withinss })
+ 
+ plot(1:10, wss, type = "b", pch = 19, frame = FALSE, xlab = "Nombre de
+clusters k", ylab = "Somme des carrés intra-cluster", main = "Méthode du
+coude (Elbow Method)")
+```
+
+```{r}
+library(cluster)
+
+# Nombre de clusters à tester
+k_values <- 2:10  # Par exemple, tester k allant de 2 à 10
+
+# Liste pour stocker les résultats de silhouette
+sil_scores <- vector("list", length = length(k_values))
+
+# Calculer la silhouette pour chaque k
+for (k in k_values) {
+  # Effectuer le clustering k-means
+  kmeans_result <- kmeans(data, centers = k, nstart = 25)
+  
+  # Calculer la silhouette pour les résultats de clustering
+  sil_scores[[k - 1]] <- silhouette(kmeans_result$cluster, dist(data_norm))
+}
+
+# Calculer la moyenne des silhouettes pour chaque k
+avg_silhouette <- sapply(sil_scores, function(sil) mean(sil[, 3]))
+
+# Tracer la courbe de silhouette moyenne en fonction de k
+plot(k_values, avg_silhouette, type = "b", pch = 19, col = "blue",
+     xlab = "Nombre de clusters (k)", ylab = "Silhouette moyenne",
+     main = "Courbe de silhouette en fonction du nombre de clusters")
+
+```
+
+```{r}
+set.seed(7)
+data_kmeans <- data_indice %>% select(-clust)
+data_kmeans <- data_kmeans%>%column_to_rownames(var="Pays")
+# Effectuer le clustering k-means avec 4 classes
+kmeans_result <- kmeans(data_kmeans$indice, centers = 4, nstart = 25)
+```
+
+```{r}
+data_kmeans$cluster <- as.factor(kmeans_result$cluster)
+#head(data_kmeans,120)
+print(data_kmeans[1:120,c("cluster","indice")])
+```
+
+### **Visualisation des classes d'indice sur les composantes de l'ACP**
+
+Nous allons visualiser les classes d'indice sur les composantes de l'ACP, en mettant cette variable en supplémentaire dans la fonction **PCA**. Ainsi, à partir des analyses de l' analyse factorielle faites à la question 2, nous pouvons libellé nos intervalles ainsi qu'il suit:
+
+-   **classe_indice 1:** pays développés et avancés; les indices de cette classe vont de **0 à 0,26 **,
+-   **classe_indice 2:** pays à économie agricole et faible développement; ici, les indices vont de **0,26 à 0,48** ,
+-   **classe_indice 3:** pays émergents et en transition économique, pour les indices allant de **0,48 à 0,75 **,
+-   **classe_indice 4:** pays en développement et à économie tertiaire, avec des indices allant de **0,75 à 1**.
+
+```{r}
+# Renommer la variable `cluster`
+data_kmeans$cluster <- as.factor(data_kmeans$cluster)
+data_kmeans <- rename(data_kmeans, classe_indice = cluster)
+```
+
+```{r}
+
+PCA_indice <- PCA(data_kmeans, ncp=5, quanti.sup = "indice", quali.sup = "classe_indice", graph = TRUE)
+
+# Visualisation avec ellipses et coloration par variable quantitative supplémentaire
+fviz_pca_biplot(PCA_indice, axes=c(1,2),
+                habillage = "classe_indice", # Coloration par la variable qualitative (ellipses)
+                addEllipses = TRUE, # Ajouter des ellipses de concentration
+                col.var = "red", # Couleur des variables
+                col.ind = "blue", # Coloration des individus
+                repel = TRUE) +
+                theme_minimal()
+
+# Visualisation sur les axes 1 et 3
+fviz_pca_biplot(PCA_indice, axes=c(1,3),
+                habillage = "classe_indice", 
+                addEllipses = TRUE, 
+                col.var = "red", 
+                col.ind = "blue", 
+                repel = TRUE) +
+                theme_minimal()
+```
+
+### Libeller les classes d'indice
+
+```{r}
+data_kmeans$classe_indice <- factor(data_kmeans$classe_indice, levels = c(1,2,3,4), labels = c("Pays développés et avancés","Pays à économie agricole et faible développement","Pays en développement et à économie tertiaire","Pays émergents et en transition économique"))
+```
+
+```{r}
+# Indice moyen dans chaque groupe
+indices_moyens <- data_kmeans %>%group_by(classe_indice) %>%summarize(across(indice, mean, na.rm = TRUE))
+
+indices_moyens
+
+# Distribution des indices dans chaque classe
+ggplot(data = data_kmeans, aes(x=classe_indice, y=indice)) +
+  geom_line(color = "red") +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Distribution des indices normalisés",
+       x = "classe indice",
+       y = "Indice") +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+```
+
+```{r}
+# Autres visualisations
+
+# Préparation des données
+new_df <- data.frame(
+  Indice = data_kmeans$indice,
+  Classe = factor(data_kmeans$classe_indice)
+) %>%
+  arrange(Indice)
+
+# Calcul des moyennes par classe
+class_means <- new_df %>%
+  group_by(Classe) %>%
+  summarise(mean_val = mean(Indice))
+
+# Création du graphique
+ggplot(new_df, aes(x = Indice, fill = Classe)) +
+  # Histogramme semi-transparent
+  geom_histogram(aes(y = after_stat(density)),
+                alpha = 0.5,
+                position = "identity",
+                bins = 30) +
+  # Courbe de densité
+  geom_density(aes(color = Classe),
+               alpha = 0,
+               linewidth = 1) +
+  # Points sur l'axe x pour montrer la distribution
+  geom_rug(aes(color = Classe),
+           alpha = 0.6,
+           linewidth = 0.5) +
+  # Lignes verticales pour les moyennes
+  geom_vline(data = class_means,
+             aes(xintercept = mean_val, color = Classe),
+             linetype = "dashed",
+             linewidth = 0.8) +
+  # Personnalisation du thème
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(color = "grey40")
+  ) +
+  # Labels
+  labs(
+    title = "Distribution des classes par densité",
+    subtitle = "Chevauchement de l'indice entre classes",
+    x = "Valeur de l'indice",
+    y = "Densité",
+    fill = "Classe",
+    color = "Classe"
+  ) +
+  # Échelle de couleurs personnalisée
+  scale_fill_brewer(palette = "Set2") +
+  scale_color_brewer(palette = "Set2") +
+  # Facettes par classe
+  facet_wrap(~Classe, nrow = 3, scales = "free_y") +
+  # Ajustement des marges
+  theme(
+    strip.background = element_rect(fill = "grey95"),
+    strip.text = element_text(color = "black", face = "bold")
+  )
+```
+
+
+### **Récupération des différentes classes**
+
+```{r}
+intervalle_indice <- data_kmeans %>%
+  group_by(classe_indice) %>%
+  summarize(min_indice = min(indice, na.rm = TRUE),
+            max_indice = max(indice, na.rm = TRUE))
+
+intervalle_indice
+```
+
+## **Question 6: Réalisation de l'AFD** {#sec-question-6-réalisation-de-lafd style="color: blue"}
+
+```{r}
+# Copie du dataframe initial, standardisé
+data_AFD <- as.data.frame(scale(df))
+
+# Ajout de la colonne classe_indice
+data_AFD$classe_indice <- as.factor(data_kmeans$classe_indice)
+
+data_AFD <- rename(data_AFD, 
+                   Croi_PIB_hab = "Croi PIB/hab",
+                   Ctr_agri_PIB = "Ctr_agri_PIB(%)",
+                   Poids_Exp_sur_PIB = "Poids_Exp_sur_PIB(%)",
+                   Ctr_Tertiaire_PIB = "Ctr_Tertiaire_PIB(%)",
+                   Ctrind_PIB = "Ctrind_PIB(%)")
+
+head(data_AFD)
+```
+
+### Détection de multicolinéarité
+
+```{r}
+# Arranger les noms du dataframe
+#colnames(data_AFD) <- make.names(colnames(data_AFD))
+#print(colnames(data_AFD))
+```
+
+```{r}
+library(car)
+
+# Construire la formule de régression
+#formula_vif <- as.formula(paste("classe_indice ~", paste(setdiff(names(data_AFD), "classe_indice"), collapse = " + ")))
+
+# Ajuster un modèle de régression logistique multinomiale
+#modele <- multinom(formula = formula_vif, data = data_AFD)
+
+#vif_df <- data.frame(Variable = names(vif(modele)), VIF = vif(modele))
+#print(vif_df)
+
+#vif(modele)
+```
+
+### **Division des données en testing et training**
+
+La division du jeu de données est faite en appliquant la méthode de **l'échantillon test**. Ainsi, nous conserverons **80%** des données pour **l'échantillon d'entraînement (training)** et les **20%** restants pour **l'échantillon de test (testing)**.
+
+```{r}
+# Choix de l'échantilllon test
+set.seed(0)
+samples <- sample(2, nrow(data_AFD),
+              replace = TRUE,
+              prob = c(0.8, 0.2))
+training <- data_AFD[samples==1,]
+testing <- data_AFD[samples==2,]
+```
+
+### **Réalisation de l'analyse discriminante**
+
+L'analyse discriminante rélisée, conduit à l'obtention de trois nouvelles variables (**variables discrinantes**). Toutefois, la première variable discriminante a un pouvoir discriminant de **0,93**, et la deuxième a un pouvoir égale à **0,05**. La troisième variable se positionne ainsi avec un pouvoir discriminant de **0,02**. Ainsi, pour la suite des analyses, nous ne considèrerons que le premier plan discriminant.
+
+```{r}
+# L'analyse discriminante
+
+data_lda <- lda(classe_indice~., training) 
+data_lda
+```
+
+### **Analyse des résultats**
+
+#### **Les probabilités à priori**
+
+L'analyse des **probabilités à priori** montre que notre échantillon d'entraînement était ainsi constitué: **7,1%** des pays sont des **pays développés et avancés**, **31,3%** des **pays à économie agricole et développement faible**, **17,2%** des **pays émergents et en transition économique** et **44,5%** sont des **pays sous développés et à économie tertiaire**.
+
+```{r}
+# Probabilités à priori du groupe
+data_lda[["prior"]]
+```
+
+#### **Les moyennes dans les classes**
+
+```{r}
+# Moyenne des groupes
+data_lda[["means"]]
+```
+
+#### **Les coefficients des variables discriminantes**
+
+```{r}
+# Coefficients des discriminants linéaires
+data_lda[["scaling"]]
+```
+
+```{r}
+colnames(training)
+
+
+```
+
+
+```{r}
+# Équation de LD1
+training$LD1 <- (-0.8011271 * training$Croi_PIB_hab) +
+        (-1.0221042 * training$Ctr_agri_PIB) + 
+        (-0.7387970 * training$Poids_Exp_sur_PIB) + 
+        (-1.98717547 * training$Ctr_Tertiaire_PIB) + 
+        -0.9964991 * training$Tx_Eau_potable + 
+        (-1.77999388 * training$Ctrind_PIB) + 
+        (-0.09259953 * training$Taux_pene_Tel_mob) + 
+        (-1.2128112 * training$`Part_Pop_0-14 ans`) + 
+        (-1.4673745 * training$Part_Pop_65ans_et_plus) + 
+        (-1.4073714 * training$Pop_rurale) +
+        -0.6787517 * training$Crois_pop + 
+        (-1.6746530 * training$Use_Index_Internet)
+
+# Équation de LD2
+training$LD2 <-  0.81166331 * training$Croi_PIB_hab +
+       (-2.31120389 * training$Ctr_agri_PIB) +
+       (0.07567048 * training$Poids_Exp_sur_PIB) +
+       (-2.34130823 * training$Ctr_Tertiaire_PIB) +
+        1.81789260 * training$Tx_Eau_potable +
+       (-0.67709946 * training$Ctrind_PIB) +
+       (-0.31712505 * training$Taux_pene_Tel_mob) +
+       (0.92156238 * training$`Part_Pop_0-14 ans`) +
+       (-0.12566144 * training$Part_Pop_65ans_et_plus) +
+        0.95754218 * training$Pop_rurale +
+       (0.33896056 * training$Crois_pop) +
+       (-0.02372936 * training$Use_Index_Internet)
+
+```
+
+### **Représentations graphiques**
+
+```{r}
+ggplot(training, aes(x = LD1, y = LD2, color = classe_indice)) +
+        geom_point(size=1) +
+        stat_ellipse(geom = "path", alpha = 0.8) +
+        labs(title = "Nuage des individus", x = "Premier axe discriminant : 93,22%", y = "Second axe discriminant : 5,23%")
+```
+
+En discriminant nos individus en fonction de la première variable discriminante et la seconde, on s'aperçoit que le premier axe discriminant offre une bonne séparation entre les différents groupes de pays, malgré quelques légers chevauchements, reflétant davantage son pouvoir discriminant s'élevant à **93,22%**. Le deuxième axe n'offre pas une très bonne division des groupes dans l'ensemble, mais toutefois, cet axe permet de bien distinguer **les pays développés et avancés des pays en développement  et à économie tertiaire**.
+
+#### **Discrimination suivant le premier axe**
+
+```{r}
+ggplot(training, aes(x = LD1, fill = classe_indice)) +
+        geom_histogram(binwidth = 1, position = "dodge") +
+        labs(title = "Histogramme suivant la première variable discriminante", x = "Valeurs", y = "Fréquence") +
+        scale_fill_manual(values = c("red", "blue", "green","yellow"))
+
+ggplot(training, aes(x = LD1, color = classe_indice, fill = classe_indice)) +
+        geom_density(alpha = 0.5) +
+        labs(title = "Discrimination suivant la première variable", x = "Valeurs", y = "Densité") +
+        scale_color_manual(values = c("red", "blue", "green","yellow")) +
+        scale_fill_manual(values = c("red", "blue", "green","yellow"))
+```
+
+#### **Discrimination suivant le deuxième axe**
+
+```{r}
+ggplot(training, aes(x = LD2, fill = classe_indice)) +
+        geom_histogram(binwidth = 1, position = "dodge") +
+        labs(title = "Histogramme suivant la deuxième variable discriminante", x = "Valeurs", y = "Fréquence") +
+        scale_fill_manual(values = c("red", "blue", "green","yellow"))
+
+ggplot(training, aes(x = LD2, color = classe_indice, fill = classe_indice)) +
+        geom_density(alpha = 0.5) +
+        labs(title = "Discrimination suivant la deuxième variable", x = "Valeurs", y = "Densité") +
+        scale_color_manual(values = c("red", "blue", "green","yellow")) +
+        scale_fill_manual(values = c("red", "blue", "green","yellow"))
+```
+
+### **Prédictions**
+
+```{r}
+predicted <- predict(data_lda, testing)
+names(predicted)
+```
+
+```{r}
+score <- predicted$x
+classement <- data.frame(predicted$class)
+affectation <- cbind(testing, score, classement)
+```
+
+### **Matrice de confusion**
+
+```{r}
+
+vect <- predict(data_lda, testing)$class
+quality <- table(Actual = testing$classe_indice, Predicted = vect)
+
+quality
+
+# Pourcentage de bien classés
+sum(diag(quality))/sum(quality)*100
+
+# Le pourcentage de bien classés est de 76,2%. Par conséquant, le taux d'erreur de classement ici est de 23,8%.
+```
+
+## **Question 7: Comparaison des taux d'erreur de classement (TEC)** {#sec-question-7-comparaison-des-taux-derreur-de-classement-(tec style="color: blue"}
+
+Dans cette partie, il s'agit de comparer le taux d'erreur de classement (TEC) de l'AFD réalisé, et celui de la classification sur composantes principales.
+
+### **Matrice de confusion et TEC de l'AFD**
+
+Le taux d'erreur de l'AFD est obtenu en rapportant le nombre total d'individus mal classés au nombre total de prédictions réalisées. Ce calcul nous permet alors de conclure que le taux d'erreur de classement de l'AFD réalisé s'élève à **23,8%**.
+
+```{r}
+quality
+```
+```{r}
+# Pour des besoins d'affichage de la matrice de confusion, nous allons réduire les noms.
+colnames(quality) <- c("Pays développés","Pays agricoles","Pays en développement","Pays émergents")
+rownames(quality) <- c("Pays développés","Pays agricoles","Pays en développement","Pays émergents")
+```
+
+
+```{r}
+library(ggplot2)
+
+# Convertir la table de confusion en format long pour ggplot
+quality_df <- as.data.frame(as.table(quality))
+
+# Visualiser la matrice de confusion avec ggplot
+ggplot(quality_df, aes(Actual, Predicted, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "red", size = 5) +
+  scale_fill_gradient(low = "pink", high = "blue") +
+  theme_minimal() +
+  labs(title="Matrice de confusion de l'AFD", x = "Classe réelle", y = "Classe prédite", fill = "Fréquence") +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+
+# Pourcentage de bien classés
+sum(diag(quality))/sum(quality)*100
+
+# Le pourcentage de bien classés est de 76,2%. Par conséquant, le taux d'erreur de classement ici est de 23,8%.
+
+```
+
+### Taux d'erreur de la classification sur composantes principales
+
+```{r}
+unique(data_cluster$clust)
+unique(data_AFD$classe_indice)
+```
+
+
+```{r}
+# Récupérer les clusters de la CAH
+cluster_cah <- data_cluster$clust
+# Renommer les classes pour des besoins d'affichage de la matrice
+cluster_cah <- factor(cluster_cah, levels = c("Pays en développement et à économie tertiaire","Pays à économie agricole et faible développement","Pays émergents et en transition économique","Pays développés et avancés"), labels = c("Pays en développement", "Pays agricoles","Pays émergents", "Pays développés"))
+
+# Récupérer les classes d'indice
+classes_indice <- data_AFD$classe_indice
+
+classes_indice <- factor(classes_indice, levels = c("Pays à économie agricole et faible développement", "Pays en développement et à économie tertiaire", "Pays émergents et en transition économique", "Pays développés et avancés"), labels = c("Pays agricoles", "Pays en développement","Pays émergents", "Pays développés") )
+
+# Réorganiser les niveaux de manière cohérente
+levels_order <- c("Pays agricoles", "Pays en développement","Pays émergents", "Pays développés")
+
+
+# Ajuster les niveaux pour cluster_cah et classes_indice
+cluster_cah <- factor(cluster_cah, levels = levels_order)
+classes_indice <- factor(classes_indice, levels = levels_order)
+
+# Croisement entre cluster_cah et classes_indice
+croisement <- table(cluster_cah,classes_indice)
+
+# Transformer le tableau en format long
+table_long <- as.data.frame(croisement)
+
+# Affichage avec ggplot2
+ggplot(table_long, aes(cluster_cah, classes_indice, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "black") +
+  scale_fill_gradient(low = "lightblue", high = "blue") +
+  labs(title = "Croisement entre la variable cluster le la CAH et les classes d'indice", x = "cluster_cah", y = "classes_indice") +
+  theme_minimal() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  # Incliner les labels à 45°
+
+# Taux de bien classés
+print(sum(diag(croisement)) * 100 / sum(croisement))
+
+# Le taux de bien classé pour la classification hiérarchique sur composantes principales est de 77,5%. Ainsi, le taux d'erreur (TEC) vaut 22,5%.
+```
+
+### **Conclusion :**
+
+En utilisant la **matrice de confusion** de l'AFD, ainsi que le **croisement** entre la variable `cluster` de la CAH (question 3) et la variable `classe_indice`, il ressort que le taux d'erreur de classement (TEC) obtenu par l'analyse factorielle discriminante est de **23,8%**, alors que celui de la classification hiérarchique sur composantes principales est de **54,2%**. Cette différence notable de performance indique que, malgré la robustesse de la CAH dans l'identification des groupes à partir des variables observées, l'AFD s'avère être une méthode plus fiable pour discriminer et classifier correctement les différentes catégories des pays, avec un taux d'erreur plus faible. En conséquence, l'AFD semble offrir une meilleure capacité de discrimination entre les groupes, ce qui peut être avantageux dans les contextes où une classification précise est cruciale. Toutefois, il est important de considérer que la CAH, bien que présentant un taux d'erreur plus élevé, offre une approche plus flexible, adaptée aux situations où les hypothèses sous-jacentes de la méthode AFD ne sont pas entièrement vérifiées.
